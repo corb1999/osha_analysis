@@ -101,30 +101,134 @@ cash_money <- function(x) {
 # ^ ====================================
 # :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
-# read raw dataset -----------------------------------------------
+# downloader --------------------------------------------------
 
-# load a csv file
-loader_path1 <- paste0(getwd(), "/etl/ore/raw_data.csv")
-clockin()
-raw_df <- read.csv(loader_path1, stringsAsFactors = FALSE)
-clockout()
-dim(raw_df)
+dl_fpath <- list('https://www.osha.gov/sites/default/largefiles/ITA%20Data%20CY%202016.zip', 
+     'https://www.osha.gov/sites/default/largefiles/ITA%20Data%20CY%202017.zip', 
+     'https://www.osha.gov/sites/default/largefiles/ITA%20Data%20CY%202018.zip', 
+     'https://www.osha.gov/sites/default/largefiles/ITA%20Data%20CY%202019.zip', 
+     'https://www.osha.gov/sites/default/largefiles/ITA-Data-CY-2020.zip', 
+     'https://www.osha.gov/sites/default/largefiles/ITA-data-cy2021.zip')
 
-# ^ -----
+fn_downloader <- function(arg1) {
+  save_path <- getwd() %ps% '/etl/ore/' %ps% 
+    'download_' %ps% stringr::str_sub(arg1, start = -8L)
+  download.file(arg1, destfile = save_path)
+}
 
-# clean the dataset -------------------------------------------
+lapply(dl_fpath, fn_downloader)
 
-# cleaning
-clockin()
-dfa <- raw_df %>% clean_names() %>% as_tibble()
-clockout()
-
-# cleanup !!!!!!!!!!!!!!!!!!!
-rm(raw_df)
+# cleanup !!!!!!!!!!!!!!!!!!
+rm(fn_downloader, dl_fpath)
 ls()
 trash()
 
-# ^ ----- 
+# ^ -----
+
+# unionizer script --------------------------------------------
+# a script to load and UNION ALL a number of datasets together
+# require(purrr)
+
+# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# identify dropzone where files are stored and vector the filenames
+filepath_prefix_payload <- paste0(getwd(), "/etl/ore")
+
+# put the files list into a dataframe
+payload <- data.frame(file_nm = list.files(path = filepath_prefix_payload)) %>% 
+  mutate(file_nm_full = paste0(filepath_prefix_payload, "/", 
+                               file_nm), 
+         file_suffix = stringr::str_sub(file_nm, start = -3L)) %>% 
+  filter(file_suffix == 'zip')
+
+# test +++++++++++++++++++++++++++
+payload
+# payload[1, 1]
+# payload[1, 2]
+
+# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# write a function to read each file the same way into r
+fun_readfiles <- function(filepaths) {
+  # unzip snippet
+  unzip_this <- paste0(getwd(), '/zipped')
+  unzip_to <- paste0(getwd(), '/unzipped')
+  clockin()
+  unzip(zipfile = unzip_this, exdir = unzip_to)
+  xx <- read.csv(unzip_to, stringsAsFactors = FALSE)
+  return(xx)}
+
+# test +++++++++++++++++++++++++++
+# fun_readfiles(payload[1, 2])
+
+# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# execute the file reading purrr, and time the execution
+clockin()
+payload_list <- lapply(payload[, 2], FUN = fun_readfiles)
+clockout()
+
+# test +++++++++++++++++++++++++++
+# payload_list[[1]]
+# dim(payload_list[[1]])
+
+# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# run checks and validation on the loaded files
+payload_stats <- data.frame(col_num_chk = map_dbl(payload_list, 
+                                                  ncol), 
+                            row_num_chk = map_dbl(payload_list, 
+                                                  nrow))
+
+fun_colnames_chk <- function(x) {
+  aa <- colnames(x)
+  bb <- reduce(aa, paste0)
+  return(bb)}
+
+# perform checks !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+payload_stats
+length(unique(payload_stats[, 1])) == 1
+length(unique(map_chr(payload_list, fun_colnames_chk))) == 1
+
+# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# combine into a single dataframe, as long as checks pass
+clockin()
+df <- map_dfr(payload_list, rbind)
+clockout()
+
+# test +++++++++++++++++++++++++++
+dim(df)
+
+# perform checks !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+sum(payload_stats$row_num_chk) == nrow(df)
+
+# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# execute any additional filter and manipulation before writing
+
+# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# create and append a metadata tag
+metadata_tag <- paste0("unionizer script metadata; ", 
+                       "files consumed = ", 
+                       nrow(payload_stats), 
+                       "; runtime = ", Sys.time(), 
+                       "; nrow = ", nrow(df), 
+                       "; ncol = ", ncol(df))
+metadata_tag
+df <- df %>% mutate(metadata_tag = "NA")
+df[1, "metadata_tag"] <- metadata_tag
+
+# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 # write the cleaned dataset ---------------------------------------
 
