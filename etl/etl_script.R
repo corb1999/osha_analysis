@@ -137,27 +137,30 @@ filepath_prefix_payload <- paste0(getwd(), "/etl/ore")
 payload <- data.frame(file_nm = list.files(path = filepath_prefix_payload)) %>% 
   mutate(file_nm_full = paste0(filepath_prefix_payload, "/", 
                                file_nm), 
+         file_nm_unzip = paste0(filepath_prefix_payload, "/upzipped_", 
+                                stringr::str_sub(file_nm, end = -5L)),
          file_suffix = stringr::str_sub(file_nm, start = -3L)) %>% 
-  filter(file_suffix == 'zip')
+  filter(file_suffix == 'zip') %>% select(-file_suffix)
 
 # test +++++++++++++++++++++++++++
 payload
 # payload[1, 1]
-# payload[1, 2]
+payload[1, 2]
+payload[1, 3]
 
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 # write a function to read each file the same way into r
-fun_readfiles <- function(filepaths) {
-  # unzip snippet
-  unzip_this <- paste0(getwd(), '/zipped')
-  unzip_to <- paste0(getwd(), '/unzipped')
-  clockin()
-  unzip(zipfile = unzip_this, exdir = unzip_to)
-  xx <- read.csv(unzip_to, stringsAsFactors = FALSE)
-  return(xx)}
+fun_readfiles <- function(arg1, arg2) {
+  unzip(zipfile = arg1, exdir = arg2)
+  aa <- list.files(arg2)
+  readpath <- paste0(arg2, '/', aa)
+  xx <- read.csv(readpath, stringsAsFactors = FALSE)
+  return(xx)
+}
 
 # test +++++++++++++++++++++++++++
-# fun_readfiles(payload[1, 2])
+fun_readfiles(payload[1, 2], payload[1, 3])
 
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # execute the file reading purrr, and time the execution
