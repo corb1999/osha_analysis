@@ -41,4 +41,5 @@ vignettes/*.pdf
 # asdf
 *.zip
 *.csv
+*.rds
 
