@@ -19,7 +19,7 @@ library(tidyverse)
 library(tidylog)
 library(lubridate)
 library(scales)
-# library(gt)
+library(fs)
 library(janitor)
 set.seed(metadatar$seed_set[1])
 options(digits = 4, max.print = 99, warnPartialMatchDollar = TRUE, 
@@ -160,13 +160,29 @@ fun_readfiles <- function(arg1, arg2) {
 }
 
 # test +++++++++++++++++++++++++++
-fun_readfiles(payload[1, 2], payload[1, 3])
+# fun_readfiles(payload[1, 2], payload[1, 3])
+# asdf <- data_dictionary(payload_list[1])
+# asdf
 
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # execute the file reading purrr, and time the execution
 clockin()
-payload_list <- lapply(payload[, 2], FUN = fun_readfiles)
+payload_list <- purrr::map2(.x = payload[, 2], 
+                            .y = payload[, 3], 
+                            fun_readfiles)
 clockout()
+
+# need a function to coerce the ein column value to chr so can later bind
+fn_interim <- function(arg_df) {
+  xx <- mutate(.data = arg_df, 
+               ein = as.character(ein), 
+               establishment_type = as.character(establishment_type))
+  return(xx)
+}
+clockin()
+payload_list <- lapply(payload_list, fn_interim)
+clockout()
+rm(fn_interim)
 
 # test +++++++++++++++++++++++++++
 # payload_list[[1]]
@@ -182,12 +198,21 @@ payload_stats <- data.frame(col_num_chk = map_dbl(payload_list,
 fun_colnames_chk <- function(x) {
   aa <- colnames(x)
   bb <- reduce(aa, paste0)
-  return(bb)}
+  return(bb)
+}
+
+fun_colclass_chk <- function(x) {
+  aa <- sapply(x, class, simplify = TRUE)
+  bb <- reduce(aa, paste)
+  return(bb)
+}
 
 # perform checks !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 payload_stats
 length(unique(payload_stats[, 1])) == 1
 length(unique(map_chr(payload_list, fun_colnames_chk))) == 1
+# map(payload_list, fun_colclass_chk)
+length(unique(map_chr(payload_list, fun_colclass_chk))) == 1
 
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # combine into a single dataframe, as long as checks pass
@@ -197,12 +222,11 @@ clockout()
 
 # test +++++++++++++++++++++++++++
 dim(df)
+# asdf <- data_dictionary(df)
+# asdf
 
 # perform checks !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 sum(payload_stats$row_num_chk) == nrow(df)
-
-# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-# execute any additional filter and manipulation before writing
 
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # create and append a metadata tag
@@ -218,20 +242,27 @@ df[1, "metadata_tag"] <- metadata_tag
 
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+# ^ -----
 
+# data cleaning -------------------------------------------------
 
+dfa <- df |> 
+  mutate(ein = ifelse(ein == '', NA, ein), 
+         total_illnesses = (total_other_illnesses + 
+                              total_poisonings + 
+                              total_respiratory_conditions + 
+                              total_skin_disorders + 
+                              total_hearing_loss), 
+         total_inj_ill = total_injuries + total_illnesses, 
+         incidence_rate = (total_inj_ill * 200000) / total_hours_worked)
 
+# cleanup !!!!!!!!!!!!!!!!!!!!!
+rm(df)
+ls()
+trash()
+sizer(dfa)
 
-
-
-
-
-
-
-
-
-
-
+# ^ -----
 
 # write the cleaned dataset ---------------------------------------
 
@@ -265,5 +296,12 @@ filename <- paste0(getwd(), "/etl/etl_metadata.csv")
 clockin()
 write.csv(etl_metadata, file = filename, row.names = FALSE)
 clockout()
+
+# ^ ----- 
+
+# cleanup the ore folder -------------------------------------
+
+walk(payload$file_nm_full, fs::file_delete)
+walk(payload$file_nm_unzip, fs::dir_delete)
 
 # ^ ----- 
