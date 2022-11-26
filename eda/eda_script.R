@@ -47,24 +47,20 @@ mem_used()
 dt_filters <- fun_dater('2019-01-01', 
                         '2020-01-01')
 
-major_filter <- c('foo', 'bar')
-
-(pltname <- 'hello ' %ps% 
-    'world; ' %ps% 
-    reduce(major_filter, paste, sep = '; ') %ps% '; ' %ps% 
+(pltname <- 'OSHA Injury Tracking Data ' %ps% 
     dt_filters$date_text_str %ps% 
     '')
 
-dfplt <- dfa %>% 
-  filter(major %in% major_filter) %>% 
-  filter(date_var >= dt_filters$start_date, 
-         date_var <= dt_filters$end_date) %>% 
-  filter(foobar == 1)
+dfplt <- dfa |> 
+  filter(year_filing_for >= dt_filters$start_date, 
+         year_filing_for <= dt_filters$end_date) |>  
+  filter(!is.na(establishment_id))
 
 # ^ -----
 
 # run plots and visuals ------------------------------------
 
+fn_plt_hist1()
 
 
 

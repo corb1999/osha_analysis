@@ -12,6 +12,7 @@ library(tidylog)
 library(lubridate)
 library(scales)
 library(gt)
+library(patchwork)
 set.seed(metadatar$seed_set[1])
 options(digits = 4, max.print = 99, warnPartialMatchDollar = TRUE, 
         tibble.print_max = 30, scipen = 999, nwarnings = 5, 
@@ -89,7 +90,9 @@ clockout()
 dim(raw_df)
 
 # any last minute cleaning
-dfa <- raw_df
+dfa <- raw_df |> 
+  mutate(year_filing_for = as.Date(paste0(year_filing_for, '-01-01'))) |> 
+  as_tibble()
 
 # cleanup !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 rm(raw_df)
@@ -122,3 +125,7 @@ etl_metadata
 
 
 # ^ -----
+
+source(file = paste0('https://raw.githubusercontent.com/', 
+                     'corb1999/cheatcraft/', 
+                     'main/gg_helper/my_gg/my_gg_settings.R'))
